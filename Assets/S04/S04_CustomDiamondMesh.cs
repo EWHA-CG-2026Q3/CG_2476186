@@ -36,6 +36,7 @@ public class S04_CustomDiamondMesh : MonoBehaviour
         mesh.RecalculateNormals();
 
         GetComponent<MeshFilter>().mesh = mesh;
-        GetComponent<MeshRenderer>().sharedMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+
+        // 재질은 Inspector의 Mesh Renderer > Materials에서 직접 지정한 걸 사용
     }
 }
