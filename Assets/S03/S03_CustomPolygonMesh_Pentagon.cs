@@ -1,5 +1,6 @@
 using UnityEngine;
 
+[ExecuteAlways]
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class S03_CustomPolygonMesh_Pentagon : MonoBehaviour
 {
