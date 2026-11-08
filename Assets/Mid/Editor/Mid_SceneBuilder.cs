@@ -328,52 +328,100 @@ public static class Mid_SceneBuilder
         return root;
     }
 
-    // 장식: 무늬를 코드로 그려 만든 카페트 (텍스처는 처음 한 번만 만듦)
+    // 장식: 점성술 마법진이 그려진 어두운 깔개. 무늬를 코드로 그리고, 선만 아주 약하게 빛나게 함 (텍스처는 처음 한 번만 만듦)
     static void BuildCarpet(Transform props)
     {
         Transform root = Reset(props, "Mid_Carpet", new Vector3(0f, 0.005f, 0.15f));
         GameObject carpet = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        carpet.name = "Carpet";
+        carpet.name = "StarRug";
         Object.DestroyImmediate(carpet.GetComponent<Collider>());   // 밟을 때 걸리지 않게
         carpet.transform.SetParent(root, false);
         carpet.transform.localScale = new Vector3(2.6f, 0.01f, 1.9f);
 
-        Material mat = Lit("Mat_Mid_Carpet", Color.white, 0f, 0.1f);
-        mat.SetTexture("_BaseMap", CarpetTexture());
+        Texture2D tex = StarRugTexture();
+        Material mat = Lit("Mat_Mid_Carpet", Color.white, 0f, 0.2f);
+        mat.SetTexture("_BaseMap", tex);
+        SetEmission(mat, new Color(0.5f, 0.85f, 0.8f) * 0.35f);   // 어두운 바탕은 거의 안 빛나고 밝은 선만 은은하게
+        mat.SetTexture("_EmissionMap", tex);
         EditorUtility.SetDirty(mat);
         carpet.GetComponent<MeshRenderer>().sharedMaterial = mat;
     }
 
-    static Texture2D CarpetTexture()
+    // 동양풍 장식에 쓰는 부드러운 청색 계열
+    static readonly Color Sky = new Color(0.66f, 0.81f, 0.92f);       // 하늘빛
+    static readonly Color PaleSky = new Color(0.82f, 0.90f, 0.95f);   // 연하늘
+    static readonly Color Blue = new Color(0.40f, 0.58f, 0.80f);      // 청색
+    static readonly Color Indigo = new Color(0.22f, 0.34f, 0.56f);    // 쪽빛
+    static readonly Color Jade = new Color(0.70f, 0.86f, 0.84f);      // 옥색
+    static readonly Color Ivory = new Color(0.94f, 0.94f, 0.91f);     // 흰 비단
+    static readonly Color Navy = new Color(0.12f, 0.18f, 0.38f);      // 남색
+
+    // 깔개 무늬: 남흑색 바탕 위에 원 세 겹, 열두 별자리 자리 표시, 원에 내접한 팔방 별, 가운데 작은 원
+    static Texture2D StarRugTexture()
     {
-        string path = Folder + "/Tex_Mid_Carpet.png";
+        string path = Folder + "/Tex_Mid_StarRug.png";
         Texture2D existing = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
         if (existing != null) return existing;
 
         const int w = 520, h = 380;
-        Color wine = new Color(0.32f, 0.04f, 0.10f);
-        Color wineDark = new Color(0.20f, 0.02f, 0.07f);
-        Color gold = new Color(0.85f, 0.62f, 0.22f);
-        Color violet = new Color(0.18f, 0.06f, 0.30f);
+        Color ground = new Color(0.04f, 0.06f, 0.11f);   // 남흑색 바탕
+        Color band = new Color(0.07f, 0.13f, 0.17f);     // 테두리 띠 (어두운 청록)
+        Color line = new Color(0.36f, 0.62f, 0.58f);     // 마법진 선 (옥색)
+        Color silver = new Color(0.66f, 0.70f, 0.76f);   // 별자리 표시 (은색)
 
+        // 팔방 별 = 원에 내접한 정사각형 두 개(45° 엇갈림)의 변 8개
+        var star = new System.Collections.Generic.List<(Vector2, Vector2)>();
+        for (int t = 0; t < 2; t++)
+            for (int i = 0; i < 4; i++)
+            {
+                float a0 = Mathf.PI / 4f + t * Mathf.PI / 4f + i * Mathf.PI / 2f;
+                float a1 = a0 + Mathf.PI / 2f;
+                star.Add((new Vector2(Mathf.Cos(a0), Mathf.Sin(a0)) * 0.86f, new Vector2(Mathf.Cos(a1), Mathf.Sin(a1)) * 0.86f));
+            }
+
+        float SegmentDistance(Vector2 p, Vector2 a, Vector2 b)
+        {
+            Vector2 ab = b - a;
+            float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / ab.sqrMagnitude);
+            return Vector2.Distance(p, a + ab * t);
+        }
+
+        float unit = h * 0.42f;
+        float px = 1f / unit;   // 1픽셀 = 반지름 1 기준으로 얼마인지
         Texture2D tex = new Texture2D(w, h, TextureFormat.RGB24, false);
         for (int y = 0; y < h; y++)
         {
             for (int x = 0; x < w; x++)
             {
-                int edge = Mathf.Min(Mathf.Min(x, w - 1 - x), Mathf.Min(y, h - 1 - y));
-                float dx = Mathf.Abs(x - w * 0.5f) / (w * 0.3f);
-                float dy = Mathf.Abs(y - h * 0.5f) / (h * 0.3f);
-                float diamond = dx + dy;                          // 가운데 마름모 무늬
-                bool lattice = ((x + y) / 26 + (x - y + 1000) / 26) % 2 == 0;
+                float weave = y % 6 < 3 ? 1f : 0.85f;   // 짠 결
+                Color c = ground * weave;
 
-                Color c = lattice ? wine : wineDark;              // 바탕: 잔잔한 격자
-                if (diamond < 1f) c = violet;                     // 가운데 보라 마름모
-                if (diamond > 0.93f && diamond < 1f) c = gold;    // 마름모 테두리
-                if (diamond < 0.35f) c = gold;                    // 가운데 금 장식
-                if (diamond < 0.25f) c = wine;
-                if (edge < 34) c = violet;                        // 바깥 띠
-                if (edge >= 10 && edge < 14 || edge >= 30 && edge < 34) c = gold;   // 금색 줄 두 개
+                Vector2 p = new Vector2((x - w * 0.5f) / unit, (y - h * 0.5f) / unit);
+                float r = p.magnitude;
+                float ang = Mathf.Atan2(p.y, p.x);
+
+                // 원 세 겹
+                if (Mathf.Abs(r - 1.0f) < 1.6f * px || Mathf.Abs(r - 0.86f) < 1.2f * px || Mathf.Abs(r - 0.5f) < 1.0f * px) c = line;
+                // 두 바깥 원 사이: 열두 별자리 자리마다 작은 은색 점과 짧은 눈금
+                float sector = Mathf.Repeat(ang / (2f * Mathf.PI) * 12f, 1f);
+                if (r > 0.88f && r < 0.98f)
+                {
+                    Vector2 mark = new Vector2(Mathf.Cos(Mathf.Round(ang / (2f * Mathf.PI) * 12f) * 2f * Mathf.PI / 12f), Mathf.Sin(Mathf.Round(ang / (2f * Mathf.PI) * 12f) * 2f * Mathf.PI / 12f)) * 0.93f;
+                    if (Vector2.Distance(p, mark) < 3.2f * px) c = silver;
+                    if (Mathf.Abs(sector - 0.5f) < 0.6f * px * 12f / (2f * Mathf.PI * r) * 2f) c = line * 0.7f;   // 칸 나눔 눈금
+                }
+                // 팔방 별
+                foreach (var (a0, a1) in star)
+                    if (SegmentDistance(p, a0, a1) < 1.1f * px) c = line;
+                // 가운데: 작은 원과 은색 점
+                if (Mathf.Abs(r - 0.14f) < 1.0f * px) c = line;
+                if (r < 0.04f) c = silver;
+
+                // 테두리: 어두운 청록 띠 + 옥색 가는 줄 두 개
+                int edge = Mathf.Min(Mathf.Min(x, w - 1 - x), Mathf.Min(y, h - 1 - y));
+                if (edge < 22) c = band * weave;
+                if (edge == 6 || edge == 7 || edge == 18) c = line;
+
                 tex.SetPixel(x, y, c);
             }
         }
@@ -384,14 +432,14 @@ public static class Mid_SceneBuilder
         return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
     }
 
-    // 장식: 둥근 다리 하나짜리 원형 테이블 + 바닥 가까이 늘어지는 보라 테이블보. 상판 높이를 돌려줌
-    // 둘 다 받침대와 같은 회전체 메시(Mid_PedestalMesh)에 옆모습만 다르게 줌
+    // 장식: 다리 하나짜리 둥근 테이블 + 바닥까지 늘어지는 어두운 남청색 천. 상판 높이를 돌려줌
+    // 테이블과 천은 받침대와 같은 회전체 메시(Mid_PedestalMesh)에 옆모습만 다르게 줌
     static float BuildTable(Transform props)
     {
         Transform root = Reset(props, "Mid_Table", Vector3.zero);
         const float top = TableHeight;
 
-        Material wood = Lit("Mat_Mid_DarkWood", new Color(0.28f, 0.15f, 0.08f), 0f, 0.45f);
+        Material wood = Lit("Mat_Mid_DarkWood", new Color(0.24f, 0.13f, 0.07f), 0f, 0.55f);
         GameObject table = MeshObject<Mid_PedestalMesh>("RoundTable", root, Vector3.zero, Vector3.zero, wood);
         Mid_PedestalMesh tableMesh = table.GetComponent<Mid_PedestalMesh>();
         tableMesh.segments = 48;
@@ -403,27 +451,29 @@ public static class Mid_SceneBuilder
         };
         tableMesh.Build();
 
-        Material velvet = Lit("Mat_Mid_Velvet", new Color(0.09f, 0.02f, 0.15f), 0f, 0.15f);
-        GameObject cloth = MeshObject<Mid_PedestalMesh>("TableCloth", root, Vector3.zero, Vector3.zero, velvet);
-        Mid_PedestalMesh clothMesh = cloth.GetComponent<Mid_PedestalMesh>();
-        clothMesh.segments = 48;
-        clothMesh.profile = new[]
+        // 어두운 남청색 천: 상판을 덮고 바닥 바로 위까지 퍼지며 늘어짐 (깔개와 같은 색 계열)
+        Material cloth = Lit("Mat_Mid_TableCloth", new Color(0.10f, 0.17f, 0.26f), 0f, 0.4f);
+        cloth.DisableKeyword("_EMISSION");
+        cloth.SetColor("_EmissionColor", Color.black);
+        EditorUtility.SetDirty(cloth);
+        GameObject cover = MeshObject<Mid_PedestalMesh>("TableCloth", root, Vector3.zero, Vector3.zero, cloth);
+        Mid_PedestalMesh coverMesh = cover.GetComponent<Mid_PedestalMesh>();
+        coverMesh.segments = 48;
+        coverMesh.profile = new[]
         {
-            new Vector2(0.58f, 0.12f),          // 바닥 가까이까지 늘어진 끝단
-            new Vector2(0.54f, 0.40f),
-            new Vector2(0.505f, top - 0.04f),
+            new Vector2(0.62f, 0.012f),         // 바닥에 닿을 듯한 끝단
+            new Vector2(0.58f, 0.30f),
+            new Vector2(0.53f, top - 0.12f),
+            new Vector2(0.50f, top - 0.03f),
             new Vector2(0.47f, top + 0.012f),   // 상판을 덮는 윗면 가장자리
         };
-        clothMesh.Build();
+        coverMesh.Build();
 
-        // 끝단의 금색 장식 줄
-        Material brass = AssetDatabase.LoadAssetAtPath<Material>(Folder + "/Mat_Mid_Brass.mat");
-        GameObject hem = MeshObject<Mid_RingMesh>("ClothHem", root, new Vector3(0f, 0.125f, 0f), Vector3.zero, brass);
-        Mid_RingMesh hemRing = hem.GetComponent<Mid_RingMesh>();
-        hemRing.radius = 0.58f;
-        hemRing.thickness = 0.01f;
-        hemRing.sides = 6;
-        hemRing.Build();
+        // 끝단의 가는 옥색 선: 깔개의 마법진 선처럼 아주 약하게 빛남
+        Material hem = Lit("Mat_Mid_ClothHem", new Color(0.36f, 0.62f, 0.58f), 0f, 0.5f);
+        SetEmission(hem, new Color(0.36f, 0.62f, 0.58f) * 0.4f);
+        Ring("ClothHem", root, 0.62f, 0.008f, Vector3.zero, hem);
+        root.Find("ClothHem").localPosition = new Vector3(0f, 0.02f, 0f);
 
         return top + 0.012f;
     }
@@ -457,18 +507,21 @@ public static class Mid_SceneBuilder
             mesh.Build();
         }
 
-        Light glow = AddLight("Light_Amethyst", root, new Vector3(0f, 0.25f, 0f), new Color(0.7f, 0.4f, 1f), 1.0f, 3.5f);
+        Light glow = AddLight("Light_Amethyst", root, new Vector3(0f, 0.25f, 0f), new Color(0.82f, 0.7f, 1f), 0.6f, 3f);
         glow.shadows = LightShadows.None;
     }
 
-    // 선택 ② 래스터화: 우리 래스터라이저로 그린 밤하늘이 비치는 마녀의 거울
+    // 선택 ② 래스터화: 우리 래스터라이저로 그린 블랙홀이 비치는 타원형 청동 거울
     static void BuildMirror(Transform props, Material brass, Material bronze)
     {
         Transform root = Reset(props, "Mid_Mirror", new Vector3(1.0f, 0f, 1.2f), Quaternion.Euler(0f, 24f, 0f));
         const float halfW = 0.42f, halfH = 0.68f, standTop = 0.58f;
         float center = standTop + halfH + 0.02f;
 
-        GameObject stand = MeshObject<Mid_PedestalMesh>("Stand", root, Vector3.zero, Vector3.zero, bronze);
+        // 푸른 녹이 슨 청동
+        Material patina = Lit("Mat_Mid_Patina", new Color(0.40f, 0.55f, 0.54f), 0.75f, 0.5f);
+
+        GameObject stand = MeshObject<Mid_PedestalMesh>("Stand", root, Vector3.zero, Vector3.zero, patina);
         Mid_PedestalMesh standMesh = stand.GetComponent<Mid_PedestalMesh>();
         standMesh.profile = new[]
         {
@@ -489,23 +542,48 @@ public static class Mid_SceneBuilder
         Mid_MirrorRasterizer raster = surface.AddComponent<Mid_MirrorRasterizer>();
         raster.halfWidth = halfW;
         raster.halfHeight = halfH;
+        raster.canvasWidth = 320;           // 캔버스 비율을 타원 비율에 맞춰야 블랙홀이 둥글게 보임
+        raster.canvasHeight = 512;
+        raster.enabled = false;             // 바꾼 크기로 메시와 캔버스를 다시 만듦
+        raster.enabled = true;
 
-        // 타원 테두리: 고리 메시를 세워서(x축 90°) 가로·세로를 다르게 늘림
-        GameObject frame = MeshObject<Mid_RingMesh>("Frame", root, new Vector3(0f, center, 0f), new Vector3(90f, 0f, 0f), brass);
-        Mid_RingMesh ring = frame.GetComponent<Mid_RingMesh>();
-        ring.radius = 1f;
-        ring.thickness = 0.05f;
-        ring.Build();
-        frame.transform.localScale = new Vector3(halfW + 0.02f, 0.6f, halfH + 0.02f);
+        // 타원 테두리 두 겹: 고리 메시를 세워서(x축 90°) 가로·세로를 다르게 늘림
+        Ring("Frame", root, 1f, 0.05f, new Vector3(90f, 0f, 0f), patina);
+        Transform frame = root.Find("Frame");
+        frame.localPosition = new Vector3(0f, center, 0f);
+        frame.localScale = new Vector3(halfW + 0.02f, 0.6f, halfH + 0.02f);
+        Ring("FrameOuter", root, 1f, 0.015f, new Vector3(90f, 0f, 0f), patina);
+        Transform outer = root.Find("FrameOuter");
+        outer.localPosition = new Vector3(0f, center, 0f);
+        outer.localScale = new Vector3(halfW + 0.065f, 0.6f, halfH + 0.065f);
 
-        // 테두리 꼭대기의 작은 자수정 장식
-        Material amethyst = AssetDatabase.LoadAssetAtPath<Material>(Folder + "/Mat_Mid_Amethyst.mat");
-        GameObject jewel = MeshObject<Mid_CrystalMesh>("Jewel", root, new Vector3(0f, center + halfH + 0.03f, 0f), Vector3.zero, amethyst);
-        Mid_CrystalMesh jewelMesh = jewel.GetComponent<Mid_CrystalMesh>();
-        jewelMesh.radius = 0.03f;
-        jewelMesh.bodyHeight = 0.06f;
-        jewelMesh.tipHeight = 0.05f;
-        jewelMesh.Build();
+        // 꼭대기 꼭지(뉴)와, 옆으로 늘어진 하늘빛 매듭 술
+        GameObject knob = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        knob.name = "Knob";
+        Object.DestroyImmediate(knob.GetComponent<Collider>());
+        knob.transform.SetParent(root, false);
+        knob.transform.localPosition = new Vector3(0f, center + halfH + 0.09f, 0f);
+        knob.transform.localScale = Vector3.one * 0.06f;
+        knob.GetComponent<MeshRenderer>().sharedMaterial = patina;
+
+        Material cord = Lit("Mat_Mid_Silk", Sky, 0f, 0.55f);
+        Material cordDark = Lit("Mat_Mid_Cord", Indigo, 0f, 0.4f);
+        float a = -25f * Mathf.Deg2Rad;
+        Vector3 knotPos = new Vector3(Mathf.Cos(a) * (halfW + 0.08f), center + Mathf.Sin(a) * (halfH + 0.08f), -0.02f);
+        GameObject knot = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        knot.name = "Maedeup";
+        Object.DestroyImmediate(knot.GetComponent<Collider>());
+        knot.transform.SetParent(root, false);
+        knot.transform.localPosition = knotPos;
+        knot.transform.localScale = new Vector3(0.05f, 0.06f, 0.03f);
+        knot.GetComponent<MeshRenderer>().sharedMaterial = cordDark;
+        GameObject tassel = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        tassel.name = "Tassel";
+        Object.DestroyImmediate(tassel.GetComponent<Collider>());
+        tassel.transform.SetParent(root, false);
+        tassel.transform.localPosition = knotPos + Vector3.down * 0.13f;
+        tassel.transform.localScale = new Vector3(0.035f, 0.1f, 0.035f);
+        tassel.GetComponent<MeshRenderer>().sharedMaterial = cord;
     }
 
     // 화로가 빠진 자리를 채우는 은은한 방 조명
@@ -514,7 +592,7 @@ public static class Mid_SceneBuilder
         Transform root = Reset(props, "Mid_Light_Room", new Vector3(0f, 2.4f, 0.3f));
         Light light = root.gameObject.AddComponent<Light>();
         light.type = LightType.Point;
-        light.color = new Color(1f, 0.75f, 0.6f);
+        light.color = new Color(1f, 0.9f, 0.82f);
         light.intensity = 1.5f;
         light.range = 5f;
         light.shadows = LightShadows.Soft;
